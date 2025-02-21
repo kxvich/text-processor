@@ -48,7 +48,7 @@ export default function Home() {
 	}
 
 	function wordCount(text) {
-		return text.trim().split(/\s+/).length;
+		return text.trim().length;
 	}
 
 	async function sendMessage() {
@@ -142,9 +142,7 @@ export default function Home() {
 			let summary = "";
 
 			if (available === "readily") {
-				console.log("readily");
 				summarizer = await self.ai.summarizer.create(options);
-				console.log("🔹 summarizeText() called with text:", text);
 				summary = await summarizer.summarize(text);
 			} else {
 				summarizer = await self.ai.summarizer.create();
@@ -160,7 +158,6 @@ export default function Home() {
 					i === index ? { ...msg, summary, isSummarizing: false } : msg
 				)
 			);
-			console.log("messages set successfully");
 
 			return summary;
 		} catch (error) {
@@ -173,7 +170,7 @@ export default function Home() {
 		}
 	}
 
-	async function translateText(text, targetLanguage, index) {
+	async function translateText(text, targetLanguage) {
 		try {
 			if (!self.ai || !self.ai.translator) {
 				console.error("Translator API is not available");
@@ -181,7 +178,6 @@ export default function Home() {
 			}
 
 			const available = (await self.ai.translator.capabilities()).available;
-			console.log(available);
 
 			if (available === "no") {
 				console.error("Translation is not supported");
@@ -193,23 +189,18 @@ export default function Home() {
 
 			const sourceLanguage =
 				messages[0]?.detectedLanguage?.[0]?.detectedLanguage || "en";
-			console.log(
-				`sourcelanguage:${sourceLanguage},target language ${targetLanguage}`
-			);
 
 			if (sourceLanguage === targetLanguage) {
 				return text;
 			}
 
 			if (available === "readily") {
-				console.log("✅ Translator is readily available");
 				translator = await self.ai.translator.create({
 					sourceLanguage: sourceLanguage,
 					targetLanguage: targetLanguage ? targetLanguage : "en",
 				});
 				translatedText = await translator.translate(text ? text : "");
 			} else {
-				console.log("⏳ Translator requires setup");
 				translator = await self.ai.translator.create({
 					sourceLanguage: sourceLanguage,
 					targetLanguage: targetLanguage,
@@ -221,7 +212,6 @@ export default function Home() {
 				translatedText = await translator.translate(text ? text : "");
 			}
 
-			console.log("🔹 Translated Text:", translatedText);
 			return translatedText;
 		} catch (error) {
 			console.error("Error in translation:", error);
@@ -241,7 +231,6 @@ export default function Home() {
 		const text = messages?.[0].text;
 		const targetLanguage = messages[index]?.selectedLanguage || "en";
 		if (!text || !targetLanguage) return;
-		console.log(text, targetLanguage);
 
 		setMessages((prevMessages) =>
 			prevMessages.map((msg, i) =>
@@ -250,16 +239,13 @@ export default function Home() {
 		);
 
 		try {
-			const translatedText = await translateText(text, targetLanguage, index);
-			console.log(translatedText);
+			const translatedText = await translateText(text, targetLanguage);
 
 			setMessages((prevMessages) =>
 				prevMessages.map((msg, i) =>
 					i === index ? { ...msg, translatedText, isTranslating: false } : msg
 				)
 			);
-
-			console.log(`✅ Translated: ${translatedText}`);
 		} catch (error) {
 			console.error("Error translating message:", error);
 			setMessages((prevMessages) =>
@@ -316,12 +302,10 @@ export default function Home() {
 													translation loading.... <Spinner />
 												</div>
 											)}
-											<label
-												htmlFor={`languageOptions-${index}`}
-												className="sr-only"
-											>
-												Select language
-											</label>
+											{message.summary && (
+												<p className={styles.Summary}>{message.summary}</p>
+											)}
+											<label htmlFor={`languageOptions-${index}`}></label>
 											<select
 												onChange={(e) => handleChange(e, index)}
 												className={styles.LanguageOptions}
@@ -342,7 +326,6 @@ export default function Home() {
 													<button
 														onClick={() => {
 															summarizeText(index);
-															console.log("clicked");
 														}}
 													>
 														{message.isSummarizing ? <Spinner /> : "summarize"}
@@ -361,9 +344,7 @@ export default function Home() {
 				))}
 			</div>
 			<div className={styles.TextContainer}>
-				<label htmlFor="messageInput" className="sr-only">
-					Enter your message
-				</label>
+				<label htmlFor="messageInput"></label>
 				<input
 					onInput={(e) => newMessage(e)}
 					value={currentMessage}
