@@ -1,0 +1,22 @@
+@import url("https://fonts.googleapis.com/css2?family=Alatsi&display=swap");
+
+$color-primary: #0d1b2a;
+
+* {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+html {
+	font-size: clamp(50%, 1.6vh, 75%);
+}
+
+body {
+	font-family: "Alatsi", serif;
+	background-color: $color-primary;
+}
+
+input {
+	font-size: 16px;
+}
