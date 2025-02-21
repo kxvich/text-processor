@@ -36,18 +36,19 @@ export default function Home() {
 	const [currentMessage, setCurrentMessage] = useState("");
 	const [messages, setMessages] = useState([]);
 	const [isLoading, setIsLoading] = useState(false);
-	// const [translatedOptions, setTranslatedOptions] = useState("en");
-	const [translationLoading, setTranslationLoading] = useState(false);
 	const options = {
 		sharedContext: "This is a scientific article",
 		type: "key-points",
 		format: "markdown",
 		length: "medium",
 	};
-	console.log(messages);
 
 	function newMessage(e) {
 		setCurrentMessage(e.target.value);
+	}
+
+	function wordCount(text) {
+		return text.trim().split(/\s+/).length;
 	}
 
 	async function sendMessage() {
@@ -58,17 +59,13 @@ export default function Home() {
 			detectedLanguage: [],
 			translatedText: "",
 			summary: "",
+			isTranslating: false,
+			isSummarizing: false,
 		};
 
 		setMessages((prevMessages) => [...prevMessages, newEntry]);
 
 		await detectTextLanguage(newEntry);
-
-		// const summary = await summarizeText(currentMessage);
-
-		// if (summary) {
-		// 	setMessages((prevMessages) => [...prevMessages, `Summary: ${summary}`]);
-		// }
 
 		setCurrentMessage("");
 	}
@@ -121,7 +118,13 @@ export default function Home() {
 		}
 	}
 
-	async function summarizeText(text) {
+	async function summarizeText(index) {
+		const text = messages[index].text;
+		setMessages((prevMessages) =>
+			prevMessages.map((msg, i) =>
+				i === index ? { ...msg, isSummarizing: true } : msg
+			)
+		);
 		try {
 			if (!self.ai || !self.ai.summarizer) {
 				console.error("Summarizer API is not available");
@@ -132,7 +135,6 @@ export default function Home() {
 
 			if (available === "no") {
 				console.error("Summarizer API is not available");
-				// setIsLoading(true);
 				return;
 			}
 
@@ -153,18 +155,25 @@ export default function Home() {
 				summary = await summarizer.summarize(text);
 			}
 
-			setMessages((prevMessages) => [...prevMessages, `Summary: ${summary}`]);
+			setMessages((prevMessages) =>
+				prevMessages.map((msg, i) =>
+					i === index ? { ...msg, summary, isSummarizing: false } : msg
+				)
+			);
 			console.log("messages set successfully");
 
 			return summary;
 		} catch (error) {
 			console.error("Error in summarization:", error);
-		} finally {
-			// setIsLoading(false);
+			setMessages((prevMessages) =>
+				prevMessages.map((msg, i) =>
+					i === index ? { ...msg, isSummarizing: false } : msg
+				)
+			);
 		}
 	}
 
-	async function translateText(text, targetLanguage) {
+	async function translateText(text, targetLanguage, index) {
 		try {
 			if (!self.ai || !self.ai.translator) {
 				console.error("Translator API is not available");
@@ -226,7 +235,6 @@ export default function Home() {
 				i === index ? { ...msg, selectedLanguage: newLanguage } : msg
 			)
 		);
-		// setTranslatedOptions(e.target.value);
 	}
 
 	async function handleTranslate(index) {
@@ -234,22 +242,31 @@ export default function Home() {
 		const targetLanguage = messages[index]?.selectedLanguage || "en";
 		if (!text || !targetLanguage) return;
 		console.log(text, targetLanguage);
-		setTranslationLoading(true);
+
+		setMessages((prevMessages) =>
+			prevMessages.map((msg, i) =>
+				i === index ? { ...msg, isTranslating: true } : msg
+			)
+		);
 
 		try {
-			const translatedText = await translateText(text, targetLanguage);
+			const translatedText = await translateText(text, targetLanguage, index);
 			console.log(translatedText);
-			setTranslationLoading(false);
 
 			setMessages((prevMessages) =>
 				prevMessages.map((msg, i) =>
-					i === index ? { ...msg, translatedText } : msg
+					i === index ? { ...msg, translatedText, isTranslating: false } : msg
 				)
 			);
 
 			console.log(`✅ Translated: ${translatedText}`);
 		} catch (error) {
 			console.error("Error translating message:", error);
+			setMessages((prevMessages) =>
+				prevMessages.map((msg, i) =>
+					i === index ? { ...msg, isTranslating: false } : msg
+				)
+			);
 		}
 	}
 
@@ -294,16 +311,22 @@ export default function Home() {
 													{`Translated text: ${message.translatedText}`}
 												</p>
 											)}
-											{translationLoading && (
+											{message.isTranslating && (
 												<div className={styles.TranslationLoading}>
 													translation loading.... <Spinner />
 												</div>
 											)}
+											<label
+												htmlFor={`languageOptions-${index}`}
+												className="sr-only"
+											>
+												Select language
+											</label>
 											<select
 												onChange={(e) => handleChange(e, index)}
 												className={styles.LanguageOptions}
 												name="languageOptions"
-												id=""
+												id={`languageOptions-${index}`}
 												value={message.selectedLanguage || "en"}
 											>
 												<option value="en">English</option>
@@ -315,7 +338,16 @@ export default function Home() {
 											</select>
 
 											<div className={styles.buttonContainer}>
-												<button>summarize</button>
+												{wordCount(message.text) > 150 && (
+													<button
+														onClick={() => {
+															summarizeText(index);
+															console.log("clicked");
+														}}
+													>
+														{message.isSummarizing ? <Spinner /> : "summarize"}
+													</button>
+												)}
 												<button onClick={() => handleTranslate(index)}>
 													translate
 												</button>
@@ -329,13 +361,17 @@ export default function Home() {
 				))}
 			</div>
 			<div className={styles.TextContainer}>
+				<label htmlFor="messageInput" className="sr-only">
+					Enter your message
+				</label>
 				<input
 					onInput={(e) => newMessage(e)}
 					value={currentMessage}
 					type="text"
+					id="messageInput"
 					placeholder="Enter your message"
 				/>
-				<button onClick={sendMessage}>
+				<button onClick={sendMessage} aria-label="Send message">
 					<Image
 						src="/paper-plane-regular.svg"
 						alt="send"
